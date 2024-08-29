@@ -1,67 +1,101 @@
 <?php
 
-function printCategories($categories) {
-    foreach ($categories as $category) {
-        if ($category['parent_id'] === null) {
-            echo $category['id'] . ". " . $category['name'] . PHP_EOL;
+class Category {
+    public $id;
+    public $name;
+    public $parent_id;
+    public $children = [];
+
+    public function __construct($id, $name, $parent_id = null) {
+        $this->id = $id;
+        $this->name = $name;
+        $this->parent_id = $parent_id;
+    }
+
+    public function addChild(Category $child) {
+        $this->children[] = $child;
+    }
+}
+
+class CategoryManager {
+    private $categories = [];
+    private $flatList = [];
+
+    public function addCategory(Category $category) {
+        $this->flatList[$category->id] = $category;
+        if ($category->parent_id === null) {
+            $this->categories[] = $category;
+        } else {
+            $this->flatList[$category->parent_id]->addChild($category);
+        }
+    }
+
+    public function displayCategories($categories = null, $level = 0) {
+        if ($categories === null) {
+            $categories = $this->categories;
+        }
+
+        $output = '';
+        foreach ($categories as $index => $category) {
+            $indent = str_repeat("  ", $level);
+            $output .= $indent . ($index + 1) . ". " . $category->name . " (ID: " . $category->id . ")\n";
+        }
+        return $output;
+    }
+
+    public function getCategoryById($id) {
+        return $this->flatList[$id] ?? null;
+    }
+
+    public function interactiveNavigation() {
+        $currentCategories = $this->categories;
+        $breadcrumbs = [];
+
+        while (true) {
+            echo "Текущий уровень: " . implode(" > ", array_map(function($cat) { return $cat->name; }, $breadcrumbs)) . "\n";
+            echo $this->displayCategories($currentCategories);
+            echo "Выберите категорию (введите номер) или введите 'b' для возврата, 'q' для выхода: ";
+            
+            $input = trim(fgets(STDIN));
+
+            if ($input === 'q') {
+                break;
+            } elseif ($input === 'b') {
+                if (!empty($breadcrumbs)) {
+                    array_pop($breadcrumbs);
+                    $currentCategories = empty($breadcrumbs) ? $this->categories : end($breadcrumbs)->children;
+                }
+                continue;
+            }
+
+            $index = intval($input) - 1;
+            if (isset($currentCategories[$index])) {
+                $selectedCategory = $currentCategories[$index];
+                if (!empty($selectedCategory->children)) {
+                    $breadcrumbs[] = $selectedCategory;
+                    $currentCategories = $selectedCategory->children;
+                } else {
+                    echo "Эта категория не имеет подкатегорий.\n";
+                }
+            } else {
+                echo "Неверный ввод. Пожалуйста, попробуйте снова.\n";
+            }
         }
     }
 }
 
-function printSubcategories($categories, $parentId, $level = 1) {
-    foreach ($categories as $category) {
-        if ($category['parent_id'] == $parentId) {
-            echo str_repeat('--', $level) . $category['name'] . " (ID: " . $category['id'] . ")" . PHP_EOL;
-            printSubcategories($categories, $category['id'], $level + 1);
-        }
-    }
-}
+// Пример использования
+$manager = new CategoryManager();
 
-function selectCategory($categories) {
-    echo "Список категорий:" . PHP_EOL;
-    printCategories($categories);
-    
-    $selectedId = readline("Введите ID категории для отображения её подкатегорий: ");
-    
-    $found = false;
-    foreach ($categories as $category) {
-        if ($category['id'] == $selectedId && $category['parent_id'] === null) {
-            $found = true;
-            echo "Подкатегории для категории: " . $category['name'] . PHP_EOL;
-            printSubcategories($categories, $category['id']);
-        }
-    }
-    
-    if (!$found) {
-        echo "Категория с ID $selectedId не найдена." . PHP_EOL;
-    }
-}
+$manager->addCategory(new Category(1, "Электроника"));
+$manager->addCategory(new Category(2, "Телефоны", 1));
+$manager->addCategory(new Category(3, "Смартфоны", 2));
+$manager->addCategory(new Category(4, "Кнопочные телефоны", 2));
+$manager->addCategory(new Category(5, "Компьютеры", 1));
+$manager->addCategory(new Category(6, "Ноутбуки", 5));
+$manager->addCategory(new Category(7, "Настольные ПК", 5));
+$manager->addCategory(new Category(8, "Одежда"));
+$manager->addCategory(new Category(9, "Мужская", 8));
+$manager->addCategory(new Category(10, "Женская", 8));
 
-// Список категорий
-$categories = [
-    ['id' => 1, 'name' => 'Электроника', 'parent_id' => null],
-    ['id' => 2, 'name' => 'Телефоны', 'parent_id' => 1],
-    ['id' => 3, 'name' => 'Компьютеры', 'parent_id' => 1],
-    ['id' => 4, 'name' => 'Ноутбуки', 'parent_id' => 3],
-    ['id' => 5, 'name' => 'Игровые консоли', 'parent_id' => 1],
-    ['id' => 6, 'name' => 'Телевизоры', 'parent_id' => 1],
-    ['id' => 7, 'name' => 'Аудио техника', 'parent_id' => 1],
-    ['id' => 8, 'name' => 'Домашняя электроника', 'parent_id' => 1],
-    ['id' => 9, 'name' => 'Одёжда', 'parent_id' => null],
-    ['id' => 10, 'name' => 'Мужская', 'parent_id' => 9],
-    ['id' => 11, 'name' => 'Женская', 'parent_id' => 9],
-    ['id' => 12, 'name' => 'Детская', 'parent_id' => 9],
-    ['id' => 13, 'name' => 'Спорт', 'parent_id' => null],
-    ['id' => 14, 'name' => 'Тренажеры', 'parent_id' => 13],
-    ['id' => 15, 'name' => 'Спортивная одежда', 'parent_id' => 13],
-    ['id' => 16, 'name' => 'Аксессуары для спорта', 'parent_id' => 13],
-    ['id' => 17, 'name' => 'Книги', 'parent_id' => null],
-    ['id' => 18, 'name' => 'Художественная литература', 'parent_id' => 17],
-    ['id' => 19, 'name' => 'Научная литература', 'parent_id' => 17],
-    ['id' => 20, 'name' => 'Учебная литература', 'parent_id' => 17],
-];
-
-
-// Также можно эту функцию вложить в бесконечный цикл, если
-// требуется чтобы функция не прекращала работу после выполнения а вызывалась повторно
-selectCategory($categories);
+$manager->interactiveNavigation();
